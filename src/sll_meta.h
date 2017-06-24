@@ -21,16 +21,18 @@
  *
  * where header stuff is appropriate, and
  *
- * SLL_DEFS(mysll, mynode, mylist);
+ * SLL_DEFS(mysll, mynode, mylist, nodefree);
  *
  * where source stuff is appropriate, will give you a singly linked list implementation with
  * mylist as the type keeping track of the first and last mynode node as well as the length of
  * the list, and the functions
+ *
  * void    mysll_list_clear(mylist *list)                  // clears the list so that it appears as empty (naive, no deallocation is done)
  * void    mysll_list_node_clear(mynode *node)             // clears any link data from a node (naive, no deallocation is done)
  * size_t  mysll_list_size(const mylist *list)             // returns the number of elements in the list
  * void    mysll_list_pushback(mylist *list, mynode *node) // appends a mynode element to the list
  * mynode *mysll_list_popfront(mylist *list)               // removes and returns the first element of the list (or NULL)
+ * void    mysll_list_free_contents(mylist *list)          // empties the list and calls nodefree on all nodes
  *
  * ITERATOR FUNCTIONS
  *
@@ -49,11 +51,13 @@
  * void    mysll_pool_clear(mypool *pool)                // initializes an empty pool
  * mynode *mysll_pool_get(mypool *pool)                  // returns the first node in the pool or callocs a new one iff the pool is empty
  * void    mysll_pool_return(mypool *pool, mynode *node) // puts the node back in the pool
+ * void    mysll_pool_free_contents(mypool *pool)        // empties the pool and frees memory
  *
  */
 
 #include <stddef.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #define CONCAT_(a, b) a ## _ ## b
 #define CONCAT(a, b) CONCAT_(a, b)
@@ -72,13 +76,15 @@
 	void           CONCAT(function_prefix, list_node_clear)(node_typename *node); \
 	size_t         CONCAT(function_prefix, list_size)      (const list_typename *list); \
 	void           CONCAT(function_prefix, list_pushback)  (list_typename *list, node_typename *node); \
-	node_typename *CONCAT(function_prefix, list_popfront)  (list_typename *list)
+	node_typename *CONCAT(function_prefix, list_popfront)  (list_typename *list); \
+	void           CONCAT(function_prefix, list_free)(list_typename *list)
 
 #define SLL_ITER_DECLS(function_prefix, node_typename, list_typename, iterator_typename) \
 	typedef struct { /*{{{*/\
 		list_typename *list; \
 		node_typename *prev; \
 		node_typename *current; \
+		node_typename *next; \
 	} iterator_typename; /*}}}*/\
 	void           CONCAT(function_prefix, iter_start)(iterator_typename *iter, list_typename *list); \
 	node_typename *CONCAT(function_prefix, iter_get)  (iterator_typename *iter); \
@@ -86,13 +92,14 @@
 	bool           CONCAT(function_prefix, iter_isend)(const iterator_typename *iter); \
 	node_typename *CONCAT(function_prefix, iter_pop)  (iterator_typename *iter)
 
-#define SLL_POOL_DECLS(function_prefix, list_typename, node_typename, pool_typename) \
+#define SLL_POOL_DECLS(function_prefix, node_typename, list_typename, pool_typename) \
 	typedef list_typename pool_typename; \
 	node_typename *CONCAT(function_prefix, pool_get)   (pool_typename *pool); \
-	void           CONCAT(function_prefix, pool_return)(pool_typename *pool, node_typename *node)
+	void           CONCAT(function_prefix, pool_return)(pool_typename *pool, node_typename *node); \
+	void           CONCAT(function_prefix, pool_free)(pool_typename *pool)
 
 // definitions
-#define SLL_DEFS(function_prefix, node_typename, list_typename, iterator_typename) \
+#define SLL_DEFS(function_prefix, node_typename, list_typename, node_free_func) \
 	void CONCAT(function_prefix, list_clear)(list_typename *list) { /*{{{*/ \
 		assert(list != NULL); \
 		list->first = NULL; \
@@ -130,6 +137,12 @@
 		node->sll_link_next = NULL; \
 		return node; \
 	} /*}}}*/ \
+	void CONCAT(function_prefix, list_free_contents)(list_typename *list) { /*{{{*/ \
+		while (CONCAT(function_prefix, list_size)(list) > 0) { \
+			node_typename * node = CONCAT(function_prefix, list_popfront)(list); \
+			node_free_func(node); \
+		} \
+	} /*}}}*/
 
 #define SLL_ITER_DEFS(function_prefix, node_typename, list_typename, iterator_typename) \
 	void CONCAT(function_prefix, iter_start)(iterator_typename *iter, list_typename *list) { /*{{{*/ \
@@ -138,6 +151,9 @@
 		iter->list = list; \
 		iter->prev = NULL; \
 		iter->current = list->first; \
+		if (iter->current != NULL) { \
+			iter->next = iter->current->sll_link_next; \
+		} \
 	} /*}}}*/ \
 	node_typename *CONCAT(function_prefix, iter_get)(iterator_typename *iter) { /*{{{*/ \
 		assert(iter != NULL); \
@@ -147,34 +163,40 @@
 		assert(iter != NULL); \
 		if (iter->current != NULL) { \
 			iter->prev = iter->current; \
-			iter->current = iter->current->sll_link_next; \
 		} \
-		else { \
-			iter->prev = NULL; \
+		iter->current = iter->next; \
+		if (iter->current != NULL) { \
+			iter->next = iter->current->sll_link_next; \
 		} \
 	} /*}}}*/ \
-	bool CONCAT(function_prefix, iter_isend)(iterator_typename *iter) { /*{{{*/ \
+	bool CONCAT(function_prefix, iter_isend)(const iterator_typename *iter) { /*{{{*/ \
 		assert(iter != NULL); \
-		return iter->current == NULL; \
+		return iter->current == NULL && iter->next == NULL; \
 	} /*}}}*/ \
 	node_typename *CONCAT(function_prefix, iter_pop)(iterator_typename *iter) { /*{{{*/ \
 		assert(iter != NULL); \
-		if (iter->current != NULL) { \
+		node_typename *node = iter->current; \
+		if (node != NULL) { \
 			if (iter->current == iter->list->first) { \
-				iter->list->first = iter->current->sll_link_next; \
+				iter->list->first = iter->next; \
 			} \
 			if (iter->current == iter->list->last) {\
 				iter->list->last = iter->prev; \
 			} \
-			--iter->list.n; \
+			node->sll_link_next = NULL; \
+			iter->current = NULL; \
+			--iter->list->n; \
 		} \
-		return iter->current; \
+		if (iter->prev != NULL) { \
+			iter->prev->sll_link_next = iter->next; \
+		} \
+		return node; \
 	} /*}}}*/
 
 #define SLL_POOL_DEFS(function_prefix, node_typename, list_typename, pool_typename) \
 	node_typename *CONCAT(function_prefix, pool_get)(pool_typename *pool) { /*{{{*/ \
 		assert(pool != NULL); \
-		node_typename *ret = CONCAT(function_prefix, popfront)((list_typename*)pool); \
+		node_typename *ret = CONCAT(function_prefix, list_popfront)((list_typename*)pool); \
 		if (ret == NULL) { \
 			ret = calloc(1, sizeof(node_typename)); \
 		} \
@@ -183,5 +205,9 @@
 	void CONCAT(function_prefix, pool_return)(pool_typename *pool, node_typename *node) { /*{{{*/ \
 		assert(pool != NULL); \
 		assert(node != NULL); \
-		CONCAT(function_prefix, pushback)((list_typename*)pool, node); \
+		CONCAT(function_prefix, list_pushback)((list_typename*)pool, node); \
+	} /*}}}*/ \
+	void CONCAT(function_prefix, pool_free_contents)(pool_typename *pool) { /*{{{*/ \
+		assert(pool != NULL); \
+		CONCAT(function_prefix, list_free_contents)((list_typename*)pool); \
 	} /*}}}*/
