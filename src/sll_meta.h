@@ -44,6 +44,9 @@
  * bool    mysll_iter_isend(const myiter *iter)            // returns true if the iterator has reached the end of the list (current node is NULL)
  * mynode *mysll_iter_pop(myiter *iter)                    // removes the current pointed-at node from the list and returns it (or NULL)
  *
+ * You can also make use of the macro SLL_ITER_START, as in "someiter it = SLL_ITER_START(&somelist)" to statically initialize
+ * an iterator e.g. in the initialization field of a for loop.
+ *
  * MEMORY POOL FUNCTIONS
  *
  * If you make use of the SLL_POOL_DECLS and SLL_POOL_DEFLS with parameters (mysll, mynode, mylist, mypool) additionally, you get
@@ -99,6 +102,9 @@
 	void           CONCAT(function_prefix, pool_free)(pool_typename *pool)
 
 // definitions
+
+#define SLL_ITER_START(_list) { .list=(_list), .prev=NULL, .current=(_list)->first!=NULL?(_list)->first:NULL, .next=(_list)->first!=NULL?(_list)->first->sll_link_next:NULL }
+
 #define SLL_DEFS(function_prefix, node_typename, list_typename, node_free_func) \
 	void CONCAT(function_prefix, list_clear)(list_typename *list) { /*{{{*/ \
 		assert(list != NULL); \
@@ -171,7 +177,7 @@
 	} /*}}}*/ \
 	bool CONCAT(function_prefix, iter_isend)(const iterator_typename *iter) { /*{{{*/ \
 		assert(iter != NULL); \
-		return iter->current == NULL && iter->next == NULL; \
+		return iter->list->last == iter->prev && iter->current == NULL && iter->next == NULL; \
 	} /*}}}*/ \
 	node_typename *CONCAT(function_prefix, iter_pop)(iterator_typename *iter) { /*{{{*/ \
 		assert(iter != NULL); \

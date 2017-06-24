@@ -18,6 +18,10 @@ SLL_ITER_DEFS(mysll, mynode, mylist, myiter);
 SLL_POOL_DEFS(mysll, mynode, mylist, mypool);
 
 void printnode(const mynode *n, const char *note) {
+	if (n == NULL) {
+		printf("NULL node\n");
+		return;
+	}
 	if (n->id != 0) {
 		printf("node with id %d%s\n", n->id, note);
 	}
@@ -28,9 +32,8 @@ void printnode(const mynode *n, const char *note) {
 
 int main(void) {
 
-	mypool pool = {0};
-	mylist list = {0};
-	myiter iter = {0};
+	mypool pool = {0}; // important!, or use mysll_pool_clear()
+	mylist list = {0}; // important!, or use mysll_list_clear()
 
 	printf("-\ngetting items from the pool, pool is empty so they will be created with uninitialized ids (=0 because of calloc)\n");
 	for (size_t i=1; i<=10; ++i) {
@@ -41,12 +44,13 @@ int main(void) {
 	}
 
 	printf("-\niterating over the list, and removing items with id 1,4,5,10 and returning them to the pool\n");
-	for (mysll_iter_start(&iter, &list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
+	for (myiter iter=SLL_ITER_START(&list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
 		mynode *node = mysll_iter_get(&iter);
 		// node id's are chosen to show that the iterator functions can handle
 		// removing from arbitrary positions in the list
 		if (node->id == 1 || node->id == 5 || node->id == 6 || node->id == 10) {
 			printnode(node, " - this node will be removed from the list");
+		//	printnode(node->sll_link_next, " next");
 			mysll_iter_pop(&iter);
 			mysll_pool_return(&pool, node);
 		}
@@ -55,7 +59,7 @@ int main(void) {
 		}
 	}
 	printf("-\nprinting the list again\n");
-	for (mysll_iter_start(&iter, &list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
+	for (myiter iter=SLL_ITER_START(&list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
 		mynode *node = mysll_iter_get(&iter);
 		printnode(node, "");
 	}
@@ -67,7 +71,7 @@ int main(void) {
 	}
 
 	printf("-\nprinting the list again\n");
-	for (mysll_iter_start(&iter, &list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
+	for (myiter iter=SLL_ITER_START(&list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
 		mynode *node = mysll_iter_get(&iter);
 		printnode(node, "");
 	}
@@ -78,7 +82,7 @@ int main(void) {
 		mysll_list_pushback(&list, node);
 	}
 	printf("-\nprinting the list again\n");
-	for (mysll_iter_start(&iter, &list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
+	for (myiter iter=SLL_ITER_START(&list); !mysll_iter_isend(&iter); mysll_iter_next(&iter)) {
 		mynode *node = mysll_iter_get(&iter);
 		printnode(node, "");
 	}
