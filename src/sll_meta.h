@@ -112,6 +112,7 @@
 // definitions
 
 #define SLL_ISTART(_list) { .list=(_list), .prev=NULL, .current=(_list)->first!=NULL?(_list)->first:NULL, .next=(_list)->first!=NULL?(_list)->first->sll_link_next:NULL }
+#define SLL_LNCLEAR(_NODE) do { _NODE->sll_link_next = NULL; } while (0);
 
 #define SLL_DEFS(function_prefix, node_type, list_type, node_free_func) \
 	void CONCAT(function_prefix, lclear)(list_type *list) { /*{{{*/ \
@@ -122,7 +123,7 @@
 	} /*}}}*/ \
 	void CONCAT(function_prefix, lnclear)(node_type *node) { /*{{{*/ \
 		assert(node != NULL); \
-		node->sll_link_next = NULL; \
+		SLL_LNCLEAR(node); \
 	} /*}}}*/ \
 	size_t CONCAT(function_prefix, lsize)(const list_type *list) { /*{{{*/ \
 		assert(list != NULL); \
@@ -140,6 +141,7 @@
 			list->last = node; \
 			++list->n; \
 		} \
+		SLL_LNCLEAR(node); \
 	} /*}}}*/ \
 	node_type *CONCAT(function_prefix, lpopfront)(list_type *list) { /*{{{*/ \
 		assert(list != NULL); \
@@ -148,7 +150,7 @@
 		list->first = node->sll_link_next; \
 		--list->n; \
 		if (list->first == NULL) { list->last = NULL; } \
-		node->sll_link_next = NULL; \
+		SLL_LNCLEAR(node); \
 		return node; \
 	} /*}}}*/ \
 	void CONCAT(function_prefix, lfree)(list_type *list) { /*{{{*/ \
@@ -197,7 +199,7 @@
 			if (iter->current == iter->list->last) {\
 				iter->list->last = iter->prev; \
 			} \
-			node->sll_link_next = NULL; \
+			SLL_LNCLEAR(node); \
 			iter->current = NULL; \
 			--iter->list->n; \
 		} \
