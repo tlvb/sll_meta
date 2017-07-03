@@ -106,6 +106,7 @@
 	typedef list_type pool_type; \
 	void        CONCAT(function_prefix, pclear) (pool_type *pool); \
 	node_type  *CONCAT(function_prefix, pget)   (pool_type *pool); \
+	node_type  *CONCAT(function_prefix, pgetm)  (pool_type *pool, bool *isnew); \
 	void        CONCAT(function_prefix, preturn)(pool_type *pool, node_type *node); \
 	void        CONCAT(function_prefix, pfree)  (pool_type *pool)
 
